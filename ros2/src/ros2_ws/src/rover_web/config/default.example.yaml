@@ -1,0 +1,45 @@
+web_gateway_node:
+  ros__parameters:
+    bind_address: 0.0.0.0
+    port: 8765
+
+    command_topic: /cmd_vel
+    camera_node_name: /camera_driver
+    vision_node_name: /sign_detector
+    qr_text_topic: /qr/text
+    lidar_node_name: /sllidar_node
+    led_strip_node_name: /led_strip_node
+    octoliner_node_name: /octoliner_node
+    voice_node_name: /waveshare_audio_node
+    voice_text_topic: /voice/text
+    voice_status_topic: /waveshare_audio/status
+    voice_package: rover_waveshare_audio
+    voice_executable: waveshare_audio_node
+    voice_config_file: ''
+    voice_enabled_on_start: false
+    drive_command_timeout_sec: 0.25
+    default_linear_speed_mps: 0.18
+    default_lateral_speed_mps: 0.0
+    default_angular_speed_radps: 0.70
+    max_linear_speed_mps: 1.0
+    max_lateral_speed_mps: 0.0
+    max_angular_speed_radps: 2.5
+
+    plans_directory: ~/.local/share/frob-web/plans
+    hackathon_files_root: ~/RTC_Evacuation
+    maps_root: ~/RTC_Evacuation/maps
+    terminal_enabled: true
+    terminal_url: ''
+    terminal_port: 7681
+    terminal_path: /
+    rosboard_enabled: true
+    rosboard_port: 8888
+    servo_enabled: false
+
+    odom_topic: /odometry/filtered
+    wheel_odom_topic: /odom
+    imu_topic: /imu/corrected
+    diagnostics_topic: /diagnostics
+
+    activity_limit: 1000
+    stop_hold_sec: 0.75

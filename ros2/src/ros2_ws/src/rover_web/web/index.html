@@ -1,0 +1,772 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#16B8F3">
+  <title>FROB · Robot</title>
+  <link rel="stylesheet" href="/assets/styles.css?v=neural-20260928-1">
+  <link rel="stylesheet" href="/assets/vendor/xterm.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="menu-toggle" id="menu-toggle" aria-label="Открыть меню">☰</button>
+        <div class="brand">
+          <span class="brand-mark">FROB</span>
+          <span class="brand-divider">·</span>
+          <strong id="robot-name">frob-01</strong>
+          <span class="muted" id="robot-address">—</span>
+        </div>
+      </div>
+      <div class="topbar-title" id="page-title">Главная</div>
+      <div class="topbar-right" aria-hidden="true"></div>
+    </header>
+
+    <aside class="sidebar" id="sidebar">
+      <nav>
+        <button class="nav-item active" data-page="overview" data-nav-group="home">Главная</button>
+        <button class="nav-item" data-page="ros" data-nav-group="ros">ROS State</button>
+        <button class="nav-item" data-page="drive" data-nav-group="movement">Движение</button>
+        <button class="nav-item" data-page="camera" data-nav-group="peripherals">Периферия</button>
+        <button class="nav-item" data-page="llm" data-nav-group="llm">LLM</button>
+        <button class="nav-item" id="nav-terminal" data-page="terminal" data-nav-group="terminal">Терминал</button>
+        <button class="nav-item" data-page="diagnostics" data-nav-group="service">Сервис</button>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="connection-row"><span>Web gateway</span><span id="api-dot" class="dot unknown"></span></div>
+        <div class="connection-row"><span>ROS state</span><span id="ros-dot" class="dot unknown"></span></div>
+      </div>
+    </aside>
+
+    <main class="content">
+      <section class="page active" id="page-overview">
+        <div class="two-column">
+          <article class="panel">
+            <h2>Базовая страница</h2>
+            <p>Главная теперь оставлена максимально лёгкой. Детальная телеметрия, загрузка системы, потоки данных и устройства перенесены в раздел диагностики.</p>
+            <div class="button-row">
+              <button id="overview-open-rosboard" hidden>Открыть rosboard</button>
+              <button id="overview-open-terminal" hidden>Открыть терминал</button>
+            </div>
+            <div class="status-note" id="overview-rosboard-url" hidden>Rosboard: —</div>
+          </article>
+          <article class="panel">
+            <h2>Навигация</h2>
+            <pre class="message-box">Главная — общий стартовый экран
+ROS State — ноды, топики и сервисы
+Движение — teleop, маршруты и визуализация
+Периферия — камера и лидар
+Терминал — несколько интерактивных shell-сессий
+Сервис — диагностика и настройки</pre>
+          </article>
+        </div>
+      </section>
+
+      <section class="page" id="page-ros">
+        <div class="section-tabs section-tabs-toolbar" data-tab-group="ros-state">
+          <button class="section-tab active" data-ros-tab="topics">Топики: <span id="ros-topics-tab-count">—</span></button>
+          <button class="section-tab" data-ros-tab="services">Сервисы: <span id="ros-services-tab-count">—</span></button>
+          <button class="section-tab" data-ros-tab="nodes">Ноды: <span id="ros-nodes-tab-count">—</span></button>
+          <div class="section-tabs-actions">
+            <button class="secondary" id="ros-refresh">Обновить</button>
+          </div>
+        </div>
+
+        <div class="ros-section" id="ros-section-nodes">
+          <div class="two-column ros-detail-layout">
+            <article class="panel list-panel">
+              <h2>Ноды</h2>
+              <label>Фильтр нод<input id="nodes-filter" placeholder="например: imu, nav, camera"></label>
+              <div class="scroll-list" id="nodes-list"></div>
+            </article>
+
+            <article class="panel detail-panel">
+              <div class="panel-heading-row">
+                <div>
+                  <h2 id="node-detail-title">Выбери ноду</h2>
+                  <p>Базовая информация о зарегистрированной ROS-ноде.</p>
+                </div>
+              </div>
+              <dl class="detail-list" id="node-meta"></dl>
+              <pre class="message-box" id="node-detail-json">Нет данных.</pre>
+            </article>
+          </div>
+        </div>
+
+        <div class="ros-section active" id="ros-section-topics">
+          <div class="two-column ros-detail-layout">
+            <article class="panel list-panel">
+              <h2>Топики</h2>
+              <label>Фильтр топиков<input id="topics-filter" placeholder="например: odom, cmd_vel, image"></label>
+              <div class="scroll-list" id="topics-list"></div>
+            </article>
+
+            <article class="panel detail-panel">
+              <div class="panel-heading-row">
+                <div>
+                  <h2 id="topic-detail-title">Выбери топик</h2>
+                </div>
+                <button class="secondary" id="topic-refresh">Обновить</button>
+              </div>
+              <dl class="detail-list" id="topic-meta"></dl>
+              <div class="status-note" id="topic-action-status">Выбери топик, чтобы посмотреть данные.</div>
+              <pre class="message-box" id="topic-latest-message">Нет данных.</pre>
+              <label>JSON для публикации
+                <textarea id="topic-payload" class="code-input" rows="10"></textarea>
+              </label>
+              <div class="button-row">
+                <button class="secondary" id="topic-template">Шаблон</button>
+                <button id="topic-publish">Опубликовать</button>
+              </div>
+            </article>
+          </div>
+        </div>
+
+        <div class="ros-section" id="ros-section-services">
+          <div class="two-column ros-detail-layout">
+            <article class="panel list-panel">
+              <h2>Сервисы</h2>
+              <label>Фильтр сервисов<input id="services-filter" placeholder="например: list_parameters"></label>
+              <div class="scroll-list" id="services-list"></div>
+            </article>
+
+            <article class="panel detail-panel">
+              <div class="panel-heading-row">
+                <div>
+                  <h2 id="service-detail-title">Выбери сервис</h2>
+                </div>
+                <button class="secondary" id="service-refresh">Обновить</button>
+              </div>
+              <dl class="detail-list" id="service-meta"></dl>
+              <label>JSON запроса
+                <textarea id="service-request" class="code-input" rows="10"></textarea>
+              </label>
+              <div class="button-row">
+                <button class="secondary" id="service-template">Шаблон</button>
+                <button id="service-call">Вызвать</button>
+              </div>
+              <div class="status-note" id="service-action-status">Выбери сервис, чтобы подготовить вызов.</div>
+              <pre class="message-box" id="service-response">Нет ответа.</pre>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="page" id="page-camera">
+        <div class="section-tabs section-tabs-toolbar" data-tab-group="peripherals">
+          <button class="section-tab active" data-page="camera">Камера</button>
+          <button class="section-tab" data-page="lidar">Лидар</button>
+          <div class="section-tabs-actions">
+            <button class="secondary" id="camera-refresh-topics">Обновить источники</button>
+          </div>
+        </div>
+
+        <div class="camera-grid">
+          <div class="camera-side-column">
+            <article class="panel camera-source-panel">
+              <h2>Камера · QR-распознавание</h2>
+              <div class="camera-source-row">
+                <select id="camera-topic-select" aria-label="Image topic" class="hidden"></select>
+                <button id="camera-connect">Переподключить QR-поток</button>
+              </div>
+              <div class="button-row"><button id="camera-qr-follow" type="button" class="primary">Начать следовать к QR-коду</button><button id="camera-qr-stop" type="button">Остановить</button></div><div id="camera-qr-follow-status" class="status-note">Наведение по белой подставке: до 0,06 м/с, короткие повороты до 0,08 рад/с. Остановка после чтения QR, при потере цели или препятствии. Лимит теста — 1 м.</div>
+              <div class="status-note" id="camera-qr-status">QR: ничего не распознано</div>
+            </article>
+            <article class="panel camera-qr-terminal-panel">
+              <div class="panel-heading-row">
+                <h2>QR-терминал</h2>
+                <button class="secondary" id="camera-qr-clear">Очистить</button>
+              </div>
+              <pre id="camera-qr-terminal" class="terminal-command-output">Ожидание QR-кода…</pre>
+            </article>
+
+            <article class="panel camera-settings-panel" hidden>
+              <div class="panel-heading-row camera-vision-toggle-row">
+                <h2>Обработка нейросетью</h2>
+                <label class="check-label"><input id="camera-vision-enabled" type="checkbox"> Использовать обработку</label>
+              </div>
+              <div id="camera-vision-body" class="camera-vision-body hidden">
+                <div class="form-grid compact-grid">
+                  <label>Модель (фиксированная)
+                    <select id="camera-vision-model"></select>
+                  </label>
+                  <label>Input topic<input id="camera-vision-input-topic" value="/image_raw"></label>
+                  <label>Processed raw topic<input id="camera-vision-output-topic" value="/image_processed"></label>
+                  <label>Processed compressed topic<input id="camera-vision-output-compressed-topic" value="/image_processed/compressed"></label>
+                  <label>Detections topic<input id="camera-vision-detections-topic" value="/detections"></label>
+                  <label>FPS лимит<input id="camera-vision-fps" type="number" min="0.5" max="60" step="0.5" value="10.0"></label>
+                  <label>Confidence<input id="camera-vision-confidence" type="number" min="0.01" max="1" step="0.01" value="0.30"></label>
+                  <label>NMS<input id="camera-vision-nms" type="number" min="0.01" max="1" step="0.01" value="0.45"></label>
+                </div>
+                <div class="inline-form camera-setting-flags">
+                  <label class="check-label"><input id="camera-vision-publish-raw" type="checkbox" checked> Публиковать raw</label>
+                  <label class="check-label"><input id="camera-vision-publish-compressed" type="checkbox" checked> Публиковать compressed</label>
+                  <label class="check-label"><input id="camera-vision-publish-detections" type="checkbox" checked> Публиковать detections</label>
+                  <label class="check-label"><input id="camera-vision-annotate-labels" type="checkbox" checked> Подписи классов</label>
+                  <label class="check-label"><input id="camera-vision-annotate-confidence" type="checkbox" checked> Confidence</label>
+                </div>
+                <div class="button-row">
+                  <button class="secondary" id="camera-vision-refresh">Обновить</button>
+                  <button id="camera-vision-apply">Применить</button>
+                  <button class="secondary" id="camera-vision-open-processed">Показать обработанный поток</button>
+                </div>
+              </div>
+              <div class="status-note hidden" id="camera-vision-status">Ожидание параметров обработки.</div>
+              <pre class="message-box hidden" id="camera-vision-details">—</pre>
+            </article>
+          </div>
+
+          <article class="panel camera-preview-panel">
+            <h2>Поток изображения</h2>
+            <label class="check-label"><input id="camera-neural-enabled" type="checkbox" checked> QR + нейросеть</label>
+            <div class="status-note" id="camera-neural-status">Нейросеть: подключение…</div>
+            <div class="camera-frame-wrap">
+              <img id="camera-frame" alt="Camera stream preview">
+              <canvas id="camera-mask-canvas" class="hidden" width="640" height="480"></canvas>
+              <div class="camera-empty" id="camera-empty">Изображение ещё не получено.</div>
+            </div>
+            <h3>Последние распознавания</h3>
+            <div id="perception-history" class="perception-history">Пока нет снимков.</div>
+            <div id="perception-save-status" class="status-note"></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="page" id="page-drive">
+        <div class="section-tabs section-tabs-toolbar" data-tab-group="movement">
+          <button class="section-tab active" data-page="drive">Управление</button>
+          <button class="section-tab" data-page="routes">Маршруты</button>
+          <button class="section-tab" data-page="visualization">Визуализация</button>
+          <div class="section-tabs-actions">
+            <span class="warning-chip">Команды публикуются в <code id="drive-topic-label">/cmd_vel</code></span>
+          </div>
+        </div>
+
+        <div class="two-column drive-layout">
+          <article class="panel">
+            <h2>Ручное управление</h2>
+            <div class="drive-mode-switch" role="group" aria-label="Способ управления">
+              <button id="drive-mode-keyboard" data-drive-mode="keyboard">WASD</button>
+              <button id="drive-mode-joystick" data-drive-mode="joystick">Джойстик</button>
+            </div>
+            <div id="drive-keyboard-controls">
+              <div class="keypad" id="keypad">
+                <button disabled></button><button data-key="KeyW">W ↑</button><button disabled></button>
+                <button data-key="KeyA">A ↺</button><button data-key="KeyS">S ↓</button><button data-key="KeyD">D ↻</button>
+              </div>
+              <p class="help-text">Удерживай клавиши WASD или кнопки на экране.</p>
+            </div>
+            <div id="drive-joystick-controls" class="hidden">
+              <div id="drive-joystick" aria-label="Джойстик движения"><span class="joystick-axis">↑<br>← · →<br>↓</span><span id="drive-joystick-knob"></span></div>
+              <p class="help-text">Удерживай и тяни мышью или пальцем. Дальше от центра — быстрее. Отпусти — остановка.</p>
+            </div>
+            <button class="stop-button wide" id="drive-stop">SPACE / STOP</button>
+            <p class="help-text">Команда существует только пока удерживается клавиша или кнопка. Потеря фокуса и скрытие вкладки вызывают нулевой Twist.</p>
+          </article>
+
+          <article class="panel">
+            <h2>Параметры команды</h2>
+            <label>Скорость X <output id="linear-speed-output">0.18 м/с</output>
+              <input id="linear-speed" type="range" min="0.05" max="1.00" value="0.18" step="0.01">
+            </label>
+            <input id="lateral-speed" type="hidden" value="0">
+            <output id="lateral-speed-output" hidden>0.00 м/с</output>
+            <label>Угловая скорость <output id="angular-speed-output">0.70 рад/с</output>
+              <input id="angular-speed" type="range" min="0.05" max="2.50" value="0.70" step="0.01">
+            </label>
+            <dl class="detail-list" id="drive-meta"></dl>
+            <p id="drive-connection" class="help-text" aria-live="polite">Подключение…</p>
+            <div class="command-preview">
+              <span>Отправляемый Twist</span>
+              <pre id="drive-preview" class="message-box">linear.x: 0.00
+linear.y: 0.00
+angular.z: 0.00</pre>
+            </div>
+            <div id="drive-warning" class="notice hidden"></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="page" id="page-routes">
+        <div class="section-tabs section-tabs-toolbar" data-tab-group="movement">
+          <button class="section-tab" data-page="drive">Управление</button>
+          <button class="section-tab active" data-page="routes">Маршруты</button>
+          <button class="section-tab" data-page="visualization">Визуализация</button>
+          <div class="section-tabs-actions">
+            <button class="stop-button" id="route-stop">Остановить маршрут</button>
+          </div>
+        </div>
+
+        <div class="route-layout">
+          <article class="panel route-library">
+            <h2>Сохранённые маршруты</h2>
+            <div class="inline-form">
+              <select id="plan-select" aria-label="Маршрут"></select>
+              <button id="plan-refresh" class="secondary" title="Обновить список">↻</button>
+              <button id="plan-run">Запустить</button>
+            </div>
+            <div class="route-file-actions">
+              <label>Имя файла
+                <input id="plan-name" type="text" value="web_route.yaml" placeholder="my_route.yaml">
+              </label>
+              <button id="plan-new" class="secondary">Новый маршрут</button>
+              <button id="plan-save">Сохранить</button>
+            </div>
+            <div hidden aria-hidden="true">
+                <label>Линейная скорость, м/с<input id="route-default-linear" type="number" value="0.18" min="0.10" max="0.35" step="0.01"></label>
+                <label>Скорость подхода, м/с<input id="route-default-approach" type="number" value="0.10" min="0.05" max="0.35" step="0.01"></label>
+                <label>Допуск позиции, м<input id="route-default-position-tolerance" type="number" value="0.07" min="0.01" max="0.50" step="0.01"></label>
+                <label>Угловая скорость, рад/с<input id="route-default-angular" type="number" value="0.32" min="0.10" max="1.00" step="0.01"></label>
+                <label>Допуск угла, °<input id="route-default-angle-tolerance" type="number" value="3" min="1" max="15" step="1"></label>
+                <label>Лимит шага, с<input id="route-default-time" type="number" value="60" min="60" max="60" step="1"></label>
+            </div>
+          </article>
+
+          <article class="panel route-builder-panel">
+            <div class="panel-heading-row">
+              <div><h2>Перемещения</h2><p>Для каждого шага укажи расстояние или угол и скорость. Через 60 секунд шаг будет остановлен, маршрут продолжится.</p></div>
+              <span class="step-count" id="route-step-count">0 шагов</span>
+            </div>
+            <div class="route-add-buttons">
+              <button data-add-step="move">+ Проехать расстояние</button>
+              <button data-add-step="turn">+ Повернуть</button>
+            </div>
+            <div id="route-step-list" class="route-step-list"></div>
+            <div id="route-empty" class="empty-state">Добавь первый шаг маршрута.</div>
+          </article>
+        </div>
+
+        <div class="two-column route-bottom">
+          <article class="panel canvas-panel route-preview-panel">
+            <div class="panel-title-overlay">Предпросмотр маршрута</div>
+            <canvas id="route-preview-canvas" width="800" height="420"></canvas>
+            <div class="canvas-legend">Предпросмотр не учитывает фактическую погрешность движения.</div>
+          </article>
+          <article class="panel">
+            <h2>Вывод исполнителя</h2>
+            <pre class="log-box" id="motion-log">Исполнитель не запущен.</pre>
+          </article>
+        </div>
+
+        <article class="panel route-map-panel">
+          <div class="panel-heading-row">
+            <div>
+              <h2>Маршрут по карте: A → B → C</h2>
+              <p>Выбери карту, запусти Nav2 и нажимай на карту, чтобы добавить точки. Робот выполнит их по порядку.</p>
+            </div>
+            <span class="status-value" id="route-nav-status">Готово к настройке</span>
+          </div>
+          <div class="inline-form route-map-toolbar">
+            <label>Карта<select id="route-nav-map"></select></label>
+            <button class="secondary" id="route-nav-refresh">Обновить карты</button>
+            <button id="route-nav-services">Запустить сервисы и Nav2</button>
+            <button class="secondary" id="route-nav-stop-services">Остановить Nav2</button>
+          </div>
+          <div class="inline-form route-map-toolbar">
+            <label>Скорость, м/с<input id="route-nav-linear" type="number" min="0.10" max="0.48" step="0.01" value="0.20"></label>
+            <label>Поворот, рад/с<input id="route-nav-angular" type="number" min="0.10" max="2.50" step="0.05" value="0.70"></label>
+            <label>Лимит точки, с<input id="route-nav-timeout" type="number" min="15" max="300" step="5" value="90"></label>
+            <button id="route-nav-run">Следовать A → B → …</button>
+            <button class="danger" id="route-nav-cancel">Остановить</button>
+            <button class="secondary" id="route-nav-add-current">+ Текущая позиция</button>
+            <button class="secondary" id="route-nav-add-zero">+ Точка 0,0</button>
+            <button class="secondary" id="route-nav-clear">Очистить точки</button>
+          </div>
+          <div class="route-map-layout">
+            <div class="canvas-panel route-map-canvas-panel">
+              <canvas id="route-nav-canvas" width="1000" height="560"></canvas>
+              <div class="canvas-legend">Клик добавляет следующую точку. Координаты и курс можно исправить справа.</div>
+            </div>
+            <div>
+              <div id="route-nav-points" class="route-nav-points"></div>
+              <div id="route-nav-empty" class="empty-state">Нажми на карту: первая точка будет A.</div>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section class="page" id="page-visualization">
+        <div class="section-tabs section-tabs-toolbar" data-tab-group="movement">
+          <button class="section-tab" data-page="drive">Управление</button>
+          <button class="section-tab" data-page="routes">Маршруты</button>
+          <button class="section-tab active" data-page="visualization">Визуализация</button>
+          <div class="section-tabs-actions">
+            <div class="inline-form visualization-controls">
+              <label>Масштаб <input id="viz-scale" type="range" min="60" max="800" value="180" step="10"></label>
+              <button class="secondary compact-button" id="viz-zoom-out" title="Уменьшить">−</button>
+              <button class="secondary compact-button" id="viz-zoom-in" title="Увеличить">+</button>
+              <button class="secondary" id="viz-fit-map">Карта целиком</button>
+              <label class="check-label"><input id="viz-follow" type="checkbox" checked> Следовать за ровером</label>
+              <label class="check-label"><input id="viz-map-visible" type="checkbox"> Показывать карту</label>
+              <label>Карта
+                <select id="viz-map-select"></select>
+              </label>
+              <button class="secondary" id="viz-map-refresh">Обновить карты</button>
+              <button class="danger-secondary" id="viz-map-delete">Удалить карту</button>
+              <button class="secondary" id="viz-clear">Очистить след</button>
+            </div>
+          </div>
+        </div>
+        <article class="panel">
+          <div class="panel-heading-row">
+            <h2>Картография и навигация</h2>
+            <span class="status-value" id="nav-runtime-state">Остановлено</span>
+          </div>
+          <div class="inline-form">
+            <label>Имя новой карты<input id="mapping-name" value="my_map" maxlength="48"></label>
+            <button id="mapping-start">Создать карту</button>
+            <button id="mapping-save">Сохранить карту</button>
+            <button class="secondary" id="mapping-stop">Остановить SLAM</button>
+          </div>
+          <div class="inline-form">
+            <button id="navigation-start">Загрузить карту и запустить Nav2</button>
+            <button class="secondary" id="navigation-stop">Остановить Nav2</button>
+            <button class="danger" id="navigation-cancel">Отменить цель</button>
+          </div>
+          <div class="navigation-pose-grid">
+            <div class="navigation-pose-card start-pose-card">
+              <strong>Стартовая позиция</strong>
+              <div class="inline-form">
+                <label>X, м<input id="navigation-start-x" type="number" step="0.05" value="0"></label>
+                <label>Y, м<input id="navigation-start-y" type="number" step="0.05" value="0"></label>
+                <label>Курс, °<input id="navigation-start-yaw" type="number" step="5" value="0"></label>
+              </div>
+              <div class="button-row">
+                <button class="secondary map-pick-button" id="navigation-pick-start">Выбрать старт на карте</button>
+                <button class="secondary" id="navigation-initial-pose">Отправить старт в AMCL</button>
+              </div>
+            </div>
+            <div class="navigation-pose-card goal-pose-card">
+              <strong>Целевая позиция</strong>
+              <div class="inline-form">
+                <label>X, м<input id="navigation-goal-x" type="number" step="0.05" value="0"></label>
+                <label>Y, м<input id="navigation-goal-y" type="number" step="0.05" value="0"></label>
+                <label>Курс, °<input id="navigation-goal-yaw" type="number" step="5" value="0"></label>
+              </div>
+              <div class="inline-form">
+                <label>Скорость движения, м/с<input id="navigation-linear-speed" type="number" min="0.10" max="0.48" step="0.01" value="0.15"></label>
+                <label>Скорость поворота, рад/с<input id="navigation-angular-speed" type="number" min="0.10" max="2.5" step="0.05" value="0.30"></label>
+              </div>
+              <small>Применяются при нажатии «Следовать к цели». Вблизи препятствий и цели робот замедляется.</small>
+              <div class="button-row">
+                <button class="secondary map-pick-button" id="navigation-pick-goal">Выбрать цель на карте</button>
+                <button class="secondary" id="navigation-confirm-goal">Подтвердить цель</button>
+                <button id="navigation-goal">Следовать к цели</button>
+              </div>
+            </div>
+          </div>
+          <div class="status-note" id="navigation-status">Выбери старт или цель, затем нажми на карту и протяни мышь в направлении нужного курса.</div>
+          <pre class="message-box" id="navigation-log">—</pre>
+        </article>
+        <div class="visualization-readout">
+          <span id="viz-position">Позиция: —</span>
+          <span id="viz-yaw">Курс: —</span>
+          <span id="viz-points">Точек: 0</span>
+          <span id="viz-map-info">Карта: —</span>
+        </div>
+        <article class="panel canvas-panel visualization-panel">
+          <canvas id="odom-canvas" width="1100" height="680"></canvas>
+          <div id="viz-empty" class="canvas-empty">Ожидание данных /odom…</div>
+          <div class="canvas-legend">Зелёный — старт · красный — цель · жёлтый — путь Nav2 · голубой — пройденный след</div>
+        </article>
+      </section>
+
+      <section class="page" id="page-lidar">
+        <div class="section-tabs section-tabs-toolbar" data-tab-group="peripherals">
+          <button class="section-tab" data-page="camera">Камера</button>
+          <button class="section-tab active" data-page="lidar">Лидар</button>
+          <div class="section-tabs-actions">
+            <button class="secondary" id="lidar-refresh-topics">Обновить источники</button>
+          </div>
+        </div>
+        <div class="sensor-layout">
+          <div class="sensor-side-column">
+            <article class="panel sensor-source-panel">
+              <h2>Источник лидара</h2>
+              <label>LaserScan topic
+                <select id="lidar-topic-select"></select>
+              </label>
+              <div class="button-row">
+                <button id="lidar-connect">Подключить</button>
+              </div>
+              <dl class="detail-list" id="lidar-meta"></dl>
+              <div class="status-note" id="lidar-status">Выбери LaserScan topic.</div>
+            </article>
+          </div>
+          <article class="panel canvas-panel sensor-canvas-panel">
+            <div class="panel-title-overlay">LaserScan</div>
+            <canvas id="lidar-canvas" width="1000" height="640"></canvas>
+            <div id="lidar-empty" class="canvas-empty">Ожидание данных лидара…</div>
+            <div class="canvas-legend">Вперёд ↑ · влево ← · центр — база ровера</div>
+          </article>
+        </div>
+        <div class="sensor-readout">
+          <span id="lidar-points">Точек: 0</span>
+          <span id="lidar-range">Диапазон: —</span>
+          <span id="lidar-age">Возраст: —</span>
+          <span id="lidar-frame">Frame: —</span>
+        </div>
+      </section>
+
+
+
+
+
+      <section class="page" id="page-audio">
+        <div class="section-tabs" data-tab-group="peripherals">
+          <button class="section-tab" data-page="camera">Камера</button>
+          <button class="section-tab" data-page="lidar">Лидар</button>
+        </div>
+        <div class="two-column">
+          <article class="panel">
+            <div class="panel-heading-row">
+              <h2>Распознавание голоса</h2>
+              <label class="check-label"><input id="voice-enabled" type="checkbox"> Использовать обработку голоса</label>
+            </div>
+            <div class="status-note" id="voice-status">Ожидание статуса распознавания.</div>
+            <div id="voice-body" class="voice-body hidden">
+              <dl class="detail-list" id="voice-meta"></dl>
+              <div class="voice-current">
+                <span>Последний распознанный текст</span>
+                <pre class="message-box" id="voice-latest-text">—</pre>
+              </div>
+              <div class="button-row">
+                <button class="secondary" id="voice-refresh">Обновить</button>
+              </div>
+            </div>
+          </article>
+          <article class="panel">
+            <h2>История распознавания</h2>
+            <div id="voice-history" class="voice-history">
+              <div class="notice">Распознавание выключено.</div>
+            </div>
+            <pre class="message-box" id="voice-log">—</pre>
+          </article>
+        </div>
+      </section>
+
+      <section class="page" id="page-actuators">
+        <div class="section-tabs" data-tab-group="peripherals">
+          <button class="section-tab" data-page="camera">Камера</button>
+          <button class="section-tab" data-page="lidar">Лидар</button>
+        </div>
+        <div class="two-column">
+          <article class="panel">
+            <h2>Страница в разработке</h2>
+            <p>Здесь появятся состояние приводов, ручное позиционирование, пресеты положений и сервисные команды.</p>
+            <div class="notice">Пока что раздел пустой.</div>
+          </article>
+          <article class="panel">
+            <h2>План наполнения</h2>
+            <pre class="message-box">- список приводов
+- текущие положения
+- ручное управление
+- безопасные пределы
+- предустановленные позиции</pre>
+          </article>
+        </div>
+      </section>
+
+      <section class="page" id="page-hackathon">
+        <div class="page-heading hackathon-toolbar">
+          <select id="hackathon-file-select" aria-label="Выбор файла хакатона"></select>
+          <button id="hackathon-open-file">Открыть</button>
+          <button class="secondary" id="hackathon-refresh-files">Обновить список</button>
+        </div>
+        <div class="status-note" id="hackathon-file-status">Выбери файл для просмотра.</div>
+        <article class="panel hackathon-viewer-panel">
+          <div id="hackathon-file-empty" class="notice">Файл ещё не выбран.</div>
+          <iframe id="hackathon-file-frame" class="hackathon-frame hidden" title="Hackathon file preview" src="about:blank"></iframe>
+          <div id="hackathon-markdown-view" class="hackathon-markdown hidden"></div>
+        </article>
+      </section>
+
+      <section class="page" id="page-terminal">
+        <div class="page-heading terminal-toolbar">
+          <div class="status-note terminal-note" id="terminal-title">Терминал робота</div>
+          <select id="terminal-session-select" aria-label="Сессия терминала">
+            <option value="terminal-1">Терминал 1</option>
+            <option value="terminal-2">Терминал 2</option>
+            <option value="terminal-3">Терминал 3</option>
+            <option value="terminal-4">Терминал 4</option>
+          </select>
+          <button class="secondary" id="terminal-new-window">Ещё окно</button>
+          <button class="secondary" id="terminal-close-session">Завершить сессию</button>
+          <button class="secondary" id="terminal-reload">Перезапустить сессию</button>
+        </div>
+        <article class="panel command-terminal-panel">
+          <div class="terminal-topline"><span>pi@raspberrypi · bash</span><button class="secondary" id="terminal-command-clear">Очистить экран</button><button class="secondary" id="terminal-interrupt">Ctrl+C</button></div>
+          <div id="terminal-command-output" class="terminal-emulator" aria-label="Терминал робота"></div>
+          <div class="terminal-help">Вводи прямо в терминале · Tab — дополнение · ↑ ↓ — история · Ctrl+C — остановить команду</div>
+          <details class="terminal-suggestions">
+            <summary>Подсказки команд — нажми, чтобы вставить, затем Enter для запуска</summary>
+            <div id="terminal-suggestions-list"></div>
+          </details>
+        </article>
+      </section>
+
+      <section class="page" id="page-llm">
+        <article class="panel llm-chat-panel">
+          <div class="panel-heading-row">
+            <div>
+              <h2>LLM</h2>
+              <p>Черновик чата сохраняется в браузере. Здесь будут ответы робота и будущей языковой модели.</p>
+            </div>
+            <button class="secondary" id="llm-chat-clear">Новый диалог</button>
+          </div>
+          <div id="llm-chat-messages" class="llm-chat-messages"></div>
+          <div id="llm-mission-status" class="status-note">Сохрани карту и отправь задание. Робот построит путь и начнёт движение.</div>
+          <div class="llm-chat-compose">
+            <textarea id="llm-chat-input" rows="3" placeholder="Напиши сообщение..."></textarea>
+            <button id="llm-chat-send">Отправить</button>
+          </div>
+        </article>
+      </section>
+
+      <section class="page" id="page-diagnostics">
+        <div class="section-tabs section-tabs-toolbar" data-tab-group="service">
+          <button class="section-tab active" data-page="diagnostics">Диагностика</button>
+          <button class="section-tab" data-page="settings">Настройки</button>
+          <div class="section-tabs-actions">
+            <button class="secondary" id="diagnostics-refresh">Обновить</button>
+          </div>
+        </div>
+        <div class="diagnostic-health-grid">
+          <article class="health-card"><span>Моторы и одометрия</span><strong class="status-value" id="diagnostic-motor-status">—</strong><small id="diagnostic-motor-detail">Нет данных</small></article>
+          <article class="health-card"><span>IMU</span><strong class="status-value" id="diagnostic-imu-status">—</strong><small id="diagnostic-imu-detail">Нет данных</small></article>
+          <article class="health-card"><span>EKF /odom</span><strong class="status-value" id="diagnostic-odom-status">—</strong><small id="diagnostic-odom-detail">Нет данных</small></article>
+          <article class="health-card"><span>/diagnostics</span><strong class="status-value" id="diagnostic-topic-status">—</strong><small id="diagnostic-topic-detail">Нет данных</small></article>
+        </div>
+        <div class="card-grid ros-cards">
+          <article class="metric-card"><span>Нод</span><strong id="ros-nodes-count">—</strong><small>шт</small></article>
+          <article class="metric-card"><span>Топиков</span><strong id="ros-topics-count">—</strong><small>шт</small></article>
+          <article class="metric-card"><span>Сервисов</span><strong id="ros-services-count">—</strong><small>шт</small></article>
+          <article class="metric-card"><span>Image topics</span><strong id="ros-image-count">—</strong><small>шт</small></article>
+        </div>
+        <div class="card-grid metrics-grid">
+          <article class="metric-card"><span>Позиция X</span><strong id="metric-x">—</strong><small>м</small></article>
+          <article class="metric-card"><span>Позиция Y</span><strong id="metric-y">—</strong><small>м</small></article>
+          <article class="metric-card"><span>Курс</span><strong id="metric-yaw">—</strong><small>°</small></article>
+          <article class="metric-card"><span>Скорость</span><strong id="metric-speed">—</strong><small>м/с</small></article>
+          <article class="metric-card"><span>CPU</span><strong id="metric-cpu">—</strong><small>%</small></article>
+          <article class="metric-card"><span>Температура</span><strong id="metric-temp">—</strong><small>°C</small></article>
+          <article class="metric-card"><span>RAM</span><strong id="metric-ram">—</strong><small>%</small></article>
+          <article class="metric-card"><span>Диск свободен</span><strong id="metric-disk">—</strong><small>ГБ</small></article>
+        </div>
+        <div class="two-column">
+          <article class="panel">
+            <h2>Потоки данных</h2>
+            <div id="topic-health" class="status-list"></div>
+          </article>
+          <article class="panel">
+            <h2>Последняя диагностика</h2>
+            <div id="diagnostic-summary" class="status-list"></div>
+          </article>
+        </div>
+        <div class="two-column overview-bottom">
+          <article class="panel">
+            <h2>Система</h2>
+            <dl class="detail-list" id="overview-system-details"></dl>
+          </article>
+          <article class="panel">
+            <h2>Устройства</h2>
+            <pre id="overview-devices" class="message-box">—</pre>
+          </article>
+        </div>
+        <div class="two-column overview-bottom">
+          <article class="panel"><h2>/diagnostics</h2><div id="diagnostic-details" class="diagnostic-details"></div></article>
+          <article class="panel"><h2>Журнал действий</h2><div id="activity-list" class="activity-list"></div></article>
+        </div>
+      </section>
+
+      <section class="page" id="page-settings">
+        <div class="section-tabs" data-tab-group="service">
+          <button class="section-tab" data-page="diagnostics">Диагностика</button>
+          <button class="section-tab active" data-page="settings">Настройки</button>
+        </div>
+        <div class="two-column">
+          <article class="panel"><h2>Идентичность</h2><pre id="identity-json" class="message-box">—</pre></article>
+          <article class="panel">
+            <h2>Конфигурация</h2>
+            <label class="check-label"><input type="checkbox" id="compact-mode"> Компактный интерфейс</label>
+            <label class="check-label"><input type="checkbox" id="servo-enabled"> Показывать подстраницу приводов/серво</label>
+            <pre id="config-json" class="message-box">—</pre>
+          </article>
+        </div>
+        <div class="two-column overview-bottom">
+          <article class="panel camera-settings-panel">
+            <div class="panel-heading-row">
+              <div>
+                <h2>Настройки камеры</h2>
+              </div>
+              <button class="secondary" id="camera-settings-refresh">Обновить</button>
+            </div>
+            <div class="form-grid compact-grid">
+              <label>Device<input id="camera-setting-device" value="/dev/video0"></label>
+              <label>Frame ID<input id="camera-setting-frame-id" value="camera_optical_frame"></label>
+              <label>Raw topic<input id="camera-setting-image-topic" value="/image_raw"></label>
+              <label>Compressed topic<input id="camera-setting-compressed-topic" value="/image_raw/compressed"></label>
+              <label>Ширина<input id="camera-setting-width" type="number" min="160" step="1" value="1280"></label>
+              <label>Высота<input id="camera-setting-height" type="number" min="120" step="1" value="720"></label>
+              <label>FPS<input id="camera-setting-fps" type="number" min="1" max="120" step="1" value="30"></label>
+              <label>JPEG quality<input id="camera-setting-jpeg-quality" type="number" min="10" max="100" step="1" value="85"></label>
+            </div>
+            <div class="inline-form camera-setting-flags">
+              <label class="check-label"><input id="camera-setting-use-mjpeg" type="checkbox" checked> MJPEG</label>
+              <label class="check-label"><input id="camera-setting-publish-raw" type="checkbox" checked> Raw topic</label>
+              <label class="check-label"><input id="camera-setting-publish-compressed" type="checkbox" checked> Compressed topic</label>
+            </div>
+            <div class="button-row">
+              <button id="camera-settings-apply">Применить</button>
+              <button class="secondary" id="camera-preset-720p">720p</button>
+              <button class="secondary" id="camera-preset-1080p">1080p</button>
+              <button class="secondary" id="camera-preset-vga">VGA</button>
+            </div>
+            <div class="status-note" id="camera-settings-status">Ожидание текущих параметров камеры.</div>
+            <pre class="message-box" id="camera-capabilities">—</pre>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading-row">
+              <div>
+                <h2>Настройки лидара</h2>
+              </div>
+              <button class="secondary" id="lidar-settings-refresh">Обновить</button>
+            </div>
+            <div class="form-grid compact-grid">
+              <label>Channel type
+                <select id="lidar-setting-channel-type">
+                  <option value="serial">serial</option>
+                  <option value="tcp">tcp</option>
+                  <option value="udp">udp</option>
+                </select>
+              </label>
+              <label>Serial port<input id="lidar-setting-serial-port" value="/tmp/rover_devices/lidar"></label>
+              <label>Serial baudrate<input id="lidar-setting-serial-baudrate" type="number" min="9600" step="100" value="460800"></label>
+              <label>Frame ID<input id="lidar-setting-frame-id" value="lidar_link"></label>
+              <label>Scan mode<input id="lidar-setting-scan-mode" value="Standard"></label>
+              <label>Scan frequency, Hz<input id="lidar-setting-scan-frequency" type="number" min="1" max="30" step="0.1" value="10.0"></label>
+            </div>
+            <div class="inline-form camera-setting-flags">
+              <label class="check-label"><input id="lidar-setting-inverted" type="checkbox"> Inverted</label>
+              <label class="check-label"><input id="lidar-setting-angle-compensate" type="checkbox" checked> Angle compensate</label>
+            </div>
+            <div class="button-row">
+              <button id="lidar-settings-apply">Применить</button>
+            </div>
+            <div class="status-note" id="lidar-settings-status">Ожидание параметров лидара.</div>
+            <pre class="message-box" id="lidar-settings-details">—</pre>
+          </article>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast-container" class="toast-container"></div>
+  <script src="/assets/vendor/xterm.js"></script>
+  <script src="/assets/evac-map.js?v=optional-stop"></script>
+  <script src="/assets/app.js?v=neural-20260928-1"></script>
+</body>
+</html>

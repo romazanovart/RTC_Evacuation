@@ -1,0 +1,7 @@
+robot_id: frob-01
+hostname: raspberrypi
+company: "FROB"
+model: differential-drive-v1
+serial_number: FROB-01
+software_version: 0.1.0
+web_interface_version: 0.1.0

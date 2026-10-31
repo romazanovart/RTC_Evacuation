@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Эвакуация · FROB</title>
+<style>
+body{margin:0;background:#edf3f9;color:#16354a;font:16px system-ui}header{padding:18px 24px;background:#fff;display:flex;align-items:center;gap:16px;flex-wrap:wrap}h1{font-size:24px;margin:0;flex:1}main{padding:20px;display:grid;grid-template-columns:minmax(360px,760px) minmax(260px,400px);gap:22px;justify-content:center}canvas{width:100%;height:auto;border-radius:14px;touch-action:manipulation}.panel{background:#fff;padding:20px;border-radius:14px;margin-bottom:14px}button,select,textarea{font:inherit;border:1px solid #b5c9d9;border-radius:8px;padding:10px;box-sizing:border-box}button{cursor:pointer;background:#eaf4fd;color:#12374b}button:disabled{opacity:.5;cursor:default}.buttons{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}textarea,select{width:100%;margin:8px 0}textarea{min-height:80px}label{display:block;font-size:14px;margin-top:8px}.stop{background:#c93442;color:white;border:0}#status{font-weight:600}.muted{font-size:13px;color:#607588}li{margin:7px 0}a{color:#0767a0}@media(max-width:820px){main{grid-template-columns:1fr;padding:10px}} 
+</style></head><body>
+<header><h1>Полигон · 5 × 5</h1><button id="reset-all">Сбросить всё</button><button class="stop" id="stop">STOP</button></header>
+<main><section><canvas id="map" aria-label="Карта эвакуации 5 на 5"></canvas><p id="status">Загрузка…</p><p class="muted">Карта задаётся вручную. Планировщик не видит непомеченные препятствия. Перед стартом проверь реальное положение робота.</p></section>
+<aside><div class="panel"><h2 id="selected">Выбери клетку</h2><p id="description" class="muted"></p>
+<p class="muted">Нажми клетку на карте, затем выбери объект.</p>
+<div class="buttons"><button data-mark="accident">🔵 Авария</button><button data-mark="tanker">🟠 Бензовоз</button></div>
+<p class="muted">Если есть на полигоне:</p>
+<div class="buttons"><button data-mark="bus_stop">🟣 Остановка</button><button data-mark="tree">🟢 Дерево</button></div>
+<div class="buttons"><button id="erase">Убрать из клетки</button><button id="clear-markers">Сбросить маркеры</button></div></div>
+<div class="panel"><h2>Зона человека · QR</h2><p class="muted">Выбери клетку QR: можно поверх бензовоза, остановки, дерева или аварии.</p>
+<button id="person">🔴 Поставить зону QR в выбранную клетку</button>
+<label>Куда смотрит лицевая сторона QR<select id="facing"><option value="0">← Влево по карте</option><option value="1">↑ Вверх по карте</option><option value="2">→ Вправо по карте</option><option value="3">↓ Вниз по карте</option></select></label>
+<p class="muted">Робот подъедет со стороны стрелки. Дерево и остановку можно не ставить.</p></div>
+<div class="panel"><h2>Положение робота</h2><p id="pose"></p><p>Стартовое направление: ↑ к (x, y+1)</p><input type="hidden" id="heading" value="1"><div class="buttons"><button id="set-pose">Робот в выбранной клетке</button><button id="reset-pose">Робот на старте (0,0), смотрит ↑</button></div><p class="muted">Поставь робота на старт лицом вверх по карте и подтверди положение.</p></div>
+<div class="panel"><button id="save">Сохранить карту и старт</button><p class="muted">После сохранения отправь задание в LLM: маршрут → человек → QR → возврат.</p><h2>Проверка маршрута</h2><button id="preview">Показать маршрут без движения</button><ol id="steps"></ol><p>Для поездки укажи цель в чате LLM и нажми «Отправить».</p></div></aside></main>
+<script src="/assets/evac-map.js?v=optional-stop"></script><script>
+let model,pose,plan,selected=[0,0],dirty=false,running=false;
+const $=s=>document.querySelector(s);
+async function api(path,data){const r=await fetch('/api/evacuation/'+path,data===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});if(r.status===401){location.reload();throw Error('Нужен вход');}const b=await r.json();if(!r.ok)throw Error(b.error||b.message||'Ошибка');return b;}
+function draw(){if(model)drawEvacuationMap($('#map'),model,pose,plan?.path||[],selected);}
+function editor(){const c=model.cells.find(c=>c.x===selected[0]&&c.y===selected[1]);$('#selected').textContent=`Клетка (${selected.join(', ')})`;$('#description').textContent=c.description;if(model.person?.cell.join()===selected.join())$('#facing').value=model.person.facing;}
+function place(kind){if(running)throw Error('Сначала останови маршрут');if(kind==='person'){model.person={cell:[...selected],facing:Number($('#facing').value)};}else{for(const [k,p] of Object.entries(model.markers))if(p.join()===selected.join())delete model.markers[k];model.markers[kind]=[...selected];}edit();}
+function edit(){if(running)throw Error('Сначала останови маршрут');dirty=true;plan=null;$('#status').textContent='Есть несохранённые изменения';draw();}
+function bind(id,fn){$(id).onclick=async()=>{try{await fn();}catch(e){$('#status').textContent=e.message;}};}
+async function refresh(){const s=await api('status');running=s.running;if(!dirty){model=s.map;plan=s.plan;$('#heading').value='1';if(model.person)$('#facing').value=String(model.person.facing);}pose=s.pose;$('#pose').textContent=`(${pose.cell.join(', ')}), направление ${['←','↑','→','↓'][pose.heading]}${s.pose_valid?'':' — нужно подтвердить'}`;if(!dirty)$('#status').textContent=running?'Робот выполняет маршрут':(s.pose_valid?'Карта и старт сохранены.':'Поставь робота в (0,0) лицом ↑ и сохрани карту.');draw();return s;}
+$('#map').onclick=e=>{if(!model)return;const r=e.target.getBoundingClientRect(),x=(e.clientX-r.left)*760/r.width,y=(e.clientY-r.top)*820/r.height;const cell=[4-Math.floor((x-40)/136),4-Math.floor((y-70)/136)];if(cell.some(v=>v<0||v>4))return;selected=cell;editor();draw();};
+document.querySelectorAll('[data-mark]').forEach(b=>bind('[data-mark="'+b.dataset.mark+'"]',()=>place(b.dataset.mark)));
+bind('#person',()=>place('person'));
+$('#heading').onchange=()=>{if(!running){dirty=true;$('#status').textContent='Направление изменено. Сохрани карту и старт.';}};
+$('#facing').onchange=()=>{if(!running&&model.person){model.person.facing=Number($('#facing').value);edit();}};
+bind('#erase',()=>{if(running)throw Error('Сначала STOP');for(const [k,p] of Object.entries(model.markers))if(p.join()===selected.join())delete model.markers[k];if(model.person?.cell.join()===selected.join())model.person=null;edit();});
+bind('#clear-markers',async()=>{if(running)throw Error('Сначала останови маршрут');model.markers={};model.person=null;edit();await api('config',{map:model});await refresh();$('#status').textContent='Все маркеры удалены. Направление старта сохраняется кнопкой сохранения.';});
+bind('#save',async()=>{await api('config',{map:model,pose:{cell:[0,0],heading:Number($('#heading').value)}});dirty=false;await refresh();});
+bind('#set-pose',async()=>{if(dirty)throw Error('Сначала сохрани карту');await api('config',{pose:{cell:selected,heading:Number($('#heading').value)}});await refresh();});
+bind('#reset-pose',async()=>{if(dirty)throw Error('Сначала сохрани карту');await api('config',{pose:{cell:[0,0],heading:Number($('#heading').value)}});await refresh();});
+bind('#preview',async()=>{if(dirty)throw Error('Сначала сохрани карту');plan=await api('plan',{});draw();$('#steps').replaceChildren();for(const step of plan.steps){const li=document.createElement('li');li.textContent=step.text;$('#steps').append(li);}});
+bind('#reset-all',async()=>{const b=$('#reset-all');b.disabled=true;try{await api('reset',{});dirty=false;selected=[0,0];plan=null;$('#steps').replaceChildren();$('#facing').value='0';await refresh();editor();$('#status').textContent='Всё сброшено. Поставь робота на старт, выбери направление и сохрани.';}finally{b.disabled=false;}});
+bind('#stop',async()=>{await api('stop',{});await refresh();});
+refresh().then(editor).catch(e=>$('#status').textContent=e.message);
+setInterval(()=>refresh().catch(e=>$('#status').textContent=e.message),1800);
+</script></body></html>

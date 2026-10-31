@@ -1,0 +1,26 @@
+encoder_odometry:
+  ros__parameters:
+    # Параметры энкодеров
+    # Calibrated from a physically straight approximately 1.00 m run:
+    # left=1810 ticks, right=1818 ticks. Separate scales remove false yaw.
+    meters_per_tick: 0.0005513  # compatibility fallback, m/tick
+    left_meters_per_tick: 0.0005525
+    right_meters_per_tick: 0.0005501
+    wheel_base: 0.18            # м
+    
+    # Настройки публикации
+    publish_tf: false          # TF odom -> base_footprint публикует EKF
+    odom_frame_id: "odom"      # имя фрейма одометрии
+    base_frame_id: "base_footprint" # имя базового фрейма
+    
+    # Настройки фильтрации
+    encoder_min: -32768        # минимальное значение энкодера
+    encoder_max: 32767         # максимальное значение энкодера
+    update_rate: 10.0          # частота обновления (Гц)
+
+imu_bias_filter:
+  ros__parameters:
+    #2026-09-28, level hand references -90/+90deg. Bias-bracketed raw gyro
+    #integrals -87.59585/+87.33277deg. Encoder scales were NOT calibrated
+    #from these hand rotations. See tools/analyze_angle_calibration.py.
+    yaw_rate_scale: 1.0289888275

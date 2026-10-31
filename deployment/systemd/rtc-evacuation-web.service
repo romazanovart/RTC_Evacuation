@@ -1,0 +1,17 @@
+[Unit]
+Description=RTC Evacuation web, camera and QR stack
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+Environment=PYTHONUNBUFFERED=1
+Environment=RTC_EVACUATION_ROOT=%h/RTC_Evacuation
+ExecStart=%h/RTC_Evacuation/deployment/start_robot.sh
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=12
+Nice=2
+
+[Install]
+WantedBy=default.target

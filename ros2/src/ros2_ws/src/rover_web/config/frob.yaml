@@ -1,0 +1,27 @@
+robot:
+  id: frob-01
+  hostname: raspberrypi
+  company: FROB
+  model: differential-drive-v1
+  serial_number: FROB-01
+  software_version: 1.0.0
+  web_interface_version: 1.0.0
+
+geometry:
+  drive_type: differential
+  driven_wheels: 2
+  caster_wheels: 2
+  wheel_radius_m: 0.0344
+  wheel_width_m: 0.026
+  wheelbase_m: 0.18
+  track_width_m: 0.1792
+
+encoders:
+  left_meters_per_tick: 0.0005525
+  right_meters_per_tick: 0.0005501
+  update_rate_hz: 10.0
+
+base_driver:
+  max_wheel_speed_mps: 1.0
+  command_timeout_sec: 0.25
+  feedback_timeout_sec: 0.5

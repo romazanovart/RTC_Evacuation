@@ -1,0 +1,58 @@
+ekf_filter_node:
+  ros__parameters:
+    frequency: 20.0
+    two_d_mode: true
+    publish_tf: true
+    sensor_timeout: 0.25
+    map_frame: map
+    odom_frame: odom
+    base_link_frame: base_footprint
+    world_frame: odom
+    odom0: /odom
+    # Wheel pose and twist come from the SAME encoder ticks. Fuse body
+    # velocities only: absolute wheel yaw otherwise pulls the gyro-integrated
+    # heading back toward wheel-base/slip errors after every turn.
+    odom0_config:
+    - false
+    - false
+    - false
+    - false
+    - false
+    - false
+    - true
+    - true
+    - false
+    - false
+    - false
+    - true
+    - false
+    - false
+    - false
+    # Use the default (no statistical twist rejection). A5-sigma gate
+    # rejected real rapid turns/stops and extrapolated old angular velocity
+    # after the chassis had stopped. Finite/jump validation remains upstream.
+    imu0: /imu/corrected
+    imu0_config:
+    - false
+    - false
+    - false
+    - false
+    - false
+    - false
+    - false
+    - false
+    - false
+    - false
+    - false
+    - true
+    - false
+    - false
+    - false
+    imu0_differential: false
+    imu0_relative: false
+    imu0_queue_size: 10
+    imu0_nodelay: true
+    imu0_linear_acceleration_rejection_threshold: 2.5
+    imu0_remove_gravitational_acceleration: false
+    odom0_queue_size: 10
+    odom0_nodelay: true
