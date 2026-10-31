@@ -2,10 +2,14 @@
 
 ## 1. ROS 2 workspace
 
+Окружение проверенной сборки: Ubuntu 24.04 и ROS 2 Jazzy. Команды выполняются
+из корня репозитория.
+
 ```bash
+source /opt/ros/jazzy/setup.bash
 cd ros2/src/ros2_ws
 rosdep install --from-paths src --ignore-src -r -y
-colcon build --symlink-install
+colcon build --symlink-install --cmake-args -DPython3_EXECUTABLE=/usr/bin/python3
 source install/setup.bash
 ```
 
@@ -22,7 +26,10 @@ ros2 launch frob_bringup bringup.launch.py \
 ## 2. Камера и веб-интерфейс
 
 ```bash
-python3 -m pip install --user zxing-cpp==3.1.1 aiohttp PyYAML
+sudo apt install python3-opencv python3-aiohttp python3-yaml
+python3 -m pip install --only-binary=:all: --no-deps \
+  --target "$HOME/RTC_Evacuation/vision-lite/qr-deps" zxing-cpp==3.1.1
+source /opt/ros/jazzy/setup.bash
 source ros2/src/ros2_ws/install/setup.bash
 ros2 launch rover_web web.launch.py
 ```
@@ -33,26 +40,25 @@ ros2 launch rover_web web.launch.py
 curl http://127.0.0.1:8765/api/health
 ```
 
-## 3. Редактор карты на ноутбуке
+## 3. Связь с ноутбуком
 
 Задайте MAC робота в локальном окружении, не в исходном коде:
 
 ```bash
 export FROB_ROBOT_MAC=00:11:22:33:44:55
-python3 tools/field_console.py
 ```
 
-Редактор доступен на `http://127.0.0.1:1111/`. Если нужен пароль:
-
-```bash
-export FROB_FIELD_PASSWORD='change-me'
-```
+`LANPeer` ищет робота в локальной сети по идентификатору устройства и проверяет
+его HTTP health endpoint. Ноутбучный детектор использует эту настройку при
+смене DHCP-адреса робота. `tools/field_console.py` содержит вспомогательный
+сценарный обработчик текстовых заданий.
 
 ## 4. YOLO worker
 
 ```bash
-python3 -m pip install --user ultralytics
-python3 tools/object_detector.py --model models/rtk-best.pt
+python3 -m venv --system-site-packages .venv-objects
+.venv-objects/bin/pip install ultralytics
+.venv-objects/bin/python tools/object_detector.py --model models/rtk-best.pt
 ```
 
 Для автономного теста без робота:

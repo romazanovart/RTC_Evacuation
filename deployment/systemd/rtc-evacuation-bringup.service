@@ -6,7 +6,7 @@ Requires=rtc-evacuation-web.service
 [Service]
 Type=simple
 Environment=PYTHONUNBUFFERED=1
-ExecStart=/bin/bash -lc 'source /opt/ros/humble/setup.bash && source %h/RTC_Evacuation/ros2/src/ros2_ws/install/setup.bash && exec ros2 launch frob_bringup bringup.launch.py start_lidar:=false start_description:=false'
+ExecStart=/bin/bash -lc 'source /opt/ros/jazzy/setup.bash && source %h/RTC_Evacuation/ros2/src/ros2_ws/install/setup.bash && exec ros2 launch frob_bringup bringup.launch.py start_lidar:=false start_description:=false'
 Restart=on-failure
 RestartSec=3
 TimeoutStopSec=12
